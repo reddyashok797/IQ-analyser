@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IQ Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            width: 500px; /* Fixed width */
+            height: 550px; /* Fixed height */
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 5px; 
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px; 
+        }
+
+        button {
+            width: 100%;
+            padding: 12px; /* Adjusted height */
+            margin: 5px 0;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease-in-out;
+            margin-bottom:25px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #question-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #question-text {
+            font-size: 18px; /* Slightly reduced */
+            color: #444;
+            margin-bottom: 10px;
+            width: 100%;
+            height: 85px; /* Fixed height */
+            overflow: hidden;
+            text-align: center;
+        }
+
+        #options {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 7px;
+        }
+
+        label {
+            display: block;
+            width: 45%;
+            padding: 8px;
+            margin-bottom: 8px;
+            background-color: #f8f9fa;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            text-align: center;
+            height: 27px;
+        }
+
+        label.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        input[type="radio"] {
+            display: none;
+        }
+
+        #next-question {
+            width: auto;
+            background-color: #28a745;
+            color: white;
+            font-size: 16px;
+            padding: 8px 20px; /* Adjusted padding */
+            margin-top: 10px;
+            border-radius: 5px;
+            display: none;
+            position: relative;
+        }
+
+        #next-question:hover {
+            background-color: #218838;
+        }
+
+        #timer {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #ff0000;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            width: 0;
+            background-color: #007bff;
+            border-radius: 5px;
+            transition: width 0.5s;
+        }
+       
+        @media (max-width: 600px) {
+            .container {
+                width: 100%;
+                height: auto;
+            }
+
+            label {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IQ Test</h1>
+        <div id="difficulty-section">
+            <h2>Select Difficulty</h2>
+            <button onclick="startTest('easy')">Easy</button>
+            <button onclick="startTest('medium')">Medium</button>
+            <button onclick="startTest('hard')">Hard</button>
+        </div>
+
+        <div id="timer" style="display:none;">Time left: <span id="time-left">00:00</span></div>
+
+        <div id="question-section" style="display:none;">
+            <h2 id="question-text"></h2>
+            <div id="options"></div>
+            <button id="next-question" onclick="nextQuestion()" style="display:none;">Next Question</button>
+        </div>
+
+        <div id="results-section" style="display:none;">
+            <h2>Test Results</h2>
+            <p id="iq-score">Your IQ score: 0</p>
+            <p id="percentile">Your percentile: 0th</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <button onclick="restartTest()">Restart Test</button>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let currentQuestionIndex = 0;
+        let questions = [];
+        let selectedAnswers = [];
+        let countdown;
+
+        const timeLimits = {
+            easy: 10 * 60,   
+            medium: 15 * 60, 
+            hard: 15 * 60    
+        };
+
+        function startCountdown(duration) {
+            let timeRemaining = duration;
+            $('#timer').show();
+            countdown = setInterval(function () {
+                let minutes = Math.floor(timeRemaining / 60);
+                let seconds = timeRemaining % 60;
+                $('#time-left').text(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+                timeRemaining--;
+
+                if (timeRemaining < 0) {
+                    clearInterval(countdown);
+                    alert("Time's up!");
+                    submitAnswers();
+                }
+            }, 1000);
+        }
+
+        function startTest(difficulty) {
+            $.get(`/random-questions?difficulty=${difficulty}`, function (data) {
+                if (data.length > 0) {
+                    questions = data;
+                    currentQuestionIndex = 0;
+                    selectedAnswers = [];
+                    $('#difficulty-section').hide();
+                    $('#question-section').show();
+                    displayQuestion();
+                    startCountdown(timeLimits[difficulty]);
+                } else {
+                    alert('No questions found!');
+                }
+            });
+        }
+
+        function displayQuestion() {
+            let question = questions[currentQuestionIndex];
+            $('#question-text').text(question.question);
+
+            if ($('#question-text')[0].scrollHeight > $('#question-text').height()) {
+                $('#question-text').css('font-size', '16px');
+            }
+
+            let optionsHtml = '';
+            question.options.forEach(option => {
+                optionsHtml += `
+                    <label class="option">
+                        <input type="radio" name="option" value="${option}">
+                        ${option}
+                    </label>
+                `;
+            });
+            $('#options').html(optionsHtml);
+            $('#next-question').hide();
+        }
+
+        function nextQuestion() {
+            let selectedOption = $('input[name="option"]:checked').val();
+            if (!selectedOption) {
+                alert('Please select an option!');
+                return;
+            }
+
+            selectedAnswers.push({
+                questionId: questions[currentQuestionIndex].question_id,
+                answer: selectedOption
+            });
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                displayQuestion();
+            } else {
+                submitAnswers();
+            }
+        }
+
+        $(document).on('change', 'input[name="option"]', function () {
+            $('label').removeClass('active');
+            $(this).parent('label').addClass('active');
+            $('#next-question').show();
+            $('input[name="option"]').prop('disabled', true);
+        });
+
+        function submitAnswers() {
+            clearInterval(countdown);
+            $('#question-section').hide();
+            $('#results-section').show();
+            $('#progress-bar').width('0%');
+
+            let progress = 0;
+            let progressInterval = setInterval(function () {
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    fetchResults();
+                } else {
+                    progress += 10;
+                    $('#progress-bar').width(`${progress}%`);
+                }
+            }, 500);
+        }
+
+        function fetchResults() {
+            fetch('/validate-answers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedAnswers)
+            })
+            .then(response => response.json())
+            .then(data => {
+                $('#iq-score').text(`Your IQ score: ${data.iq}`);
+                $('#percentile').text(`Your percentile: ${data.percentile}`);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function restartTest() {
+            $('#results-section').hide();
+            $('#difficulty-section').show();
+            clearInterval(countdown);
+        }
+    </script>
+</body>
+</html>
